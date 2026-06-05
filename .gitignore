@@ -66,11 +66,18 @@ CMakeLists.txt.user*
 
 # Python byte code
 *.pyc
+__pycache__/
 
 # Binaries
 # --------
 *.dll
 *.exe
+build/
+dist/
 
 
-design_handoff_sdftool/
+design_handoff_sdftool/*
+!design_handoff_sdftool/assets/
+!design_handoff_sdftool/assets/**
+
+.omc/
