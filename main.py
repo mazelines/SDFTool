@@ -5,6 +5,7 @@ from pathlib import Path
 import cv2
 
 import numpy as np
+from localization import Localization
 
 from PySide6.QtCore import QObject, Slot
 from PySide6.QtQml import QQmlApplicationEngine
@@ -82,8 +83,9 @@ class SDFLib:
 
 class FuncForQml(QObject):
 
-    def __init__(self, parent=None):
+    def __init__(self, localization, parent=None):
         super().__init__(parent)
+        self.localization = localization
 
     @Slot(result=str)
     def selectPath(self):
@@ -91,6 +93,10 @@ class FuncForQml(QObject):
         if folder_path:
             print(f'Selected folder path: {folder_path}')
         return folder_path
+
+    @Slot(str, str, result=str)
+    def translateText(self, text, target_language):
+        return self.localization.translate(text, target_language)
 
     @Slot(str)
     def generateSDF(self, path):
@@ -105,7 +111,8 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     engine = QQmlApplicationEngine()
 
-    pyFunc = FuncForQml()
+    localization = Localization()
+    pyFunc = FuncForQml(localization)
     engine.rootContext().setContextProperty("pyFunc", pyFunc)
 
     qml_file = Path(__file__).resolve().parent / "main.qml"
