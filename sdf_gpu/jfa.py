@@ -1,11 +1,15 @@
 """wgpu 2-패스 JFA+1 파이프라인. NumPy in/out."""
 import os
+import sys
 import numpy as np
 import wgpu
 
 from .device import get_device
 
-_SHADER_DIR = os.path.join(os.path.dirname(__file__), "shaders")
+if getattr(sys, "frozen", False):
+    _SHADER_DIR = os.path.join(sys._MEIPASS, "sdf_gpu", "shaders")
+else:
+    _SHADER_DIR = os.path.join(os.path.dirname(__file__), "shaders")
 
 _STORAGE = wgpu.BufferUsage.STORAGE
 _COPY_SRC = wgpu.BufferUsage.COPY_SRC
