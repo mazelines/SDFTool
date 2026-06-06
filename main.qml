@@ -310,7 +310,7 @@ Window {
 
     function handleGenerateSdf() {
         if (!canGenerate()) return
-        pyFunc.generateSDFAsync(root.sdfPath)
+        pyFunc.generateSDFAsync(root.sdfPath, root.threshold, root.spread)
     }
 
     function handleGenerateAtlas() {

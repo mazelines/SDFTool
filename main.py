@@ -46,19 +46,25 @@ class SDFLib:
         super().__init__(parent)
 
     @staticmethod
-    def SDF_Generate(folder_path):
+    def SDF_Generate(folder_path, threshold_255, spread):
         output_folder = ""
+        out_dir = os.path.join(folder_path, "output")
         for filename in os.listdir(folder_path):
             file_path = os.path.join(folder_path, filename)
             # 检查文件是否是图像文件
             if os.path.isfile(file_path) and filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp')):
-                image = cv2.imread(file_path)
-                output_folder = SDF_Cpp.GenerateSDF(folder_path, filename)
+                gray = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+                if gray is None:
+                    continue
+                sdf = sdf_backend.generate_distance_field(gray, threshold_255, float(spread))
+                os.makedirs(out_dir, exist_ok=True)
+                cv2.imwrite(os.path.join(out_dir, filename), sdf)
+                output_folder = out_dir + os.sep
         return output_folder
 
     @staticmethod
-    def lerp_SDF(folder_path):
-        sdf_folder = SDFLib.SDF_Generate(folder_path)
+    def lerp_SDF(folder_path, threshold_255, spread):
+        sdf_folder = SDFLib.SDF_Generate(folder_path, threshold_255, spread)
         if sdf_folder.strip() != "":
             print("SDF生成完成")
             SDF_Cpp.SDFLerp(sdf_folder)
@@ -279,7 +285,7 @@ def generate_sdf_preview_result(image_path, threshold, spread):
     }
 
 
-def generate_sdf_result(path):
+def generate_sdf_result(path, threshold_255, spread):
     if not path or not os.path.isdir(path):
         return {
             "ok": False,
@@ -289,7 +295,7 @@ def generate_sdf_result(path):
             "sdfOutputUrl": "",
         }
 
-    output_folder = SDFLib.lerp_SDF(path)
+    output_folder = SDFLib.lerp_SDF(path, threshold_255, spread)
     sdf_output = ""
     if output_folder:
         candidate = Path(output_folder) / "SDF" / "SDF.png"
@@ -384,17 +390,17 @@ class FuncForQml(QObject):
         except Exception as exc:
             return result_json({"ok": False, "error": str(exc), "outputFile": "", "outputUrl": ""})
 
-    @Slot(str, result=str)
-    def generateSDF(self, path):
-        return result_json(generate_sdf_result(path))
+    @Slot(str, int, int, result=str)
+    def generateSDF(self, path, threshold, spread):
+        return result_json(generate_sdf_result(path, round(threshold / 100 * 255), float(spread)))
 
     @Slot(str, int, int, int, int, bool, result=str)
     def generateAtlas(self, path, row, col, resolution_x, resolution_y, is_topdown_one_texture):
         return result_json(generate_atlas_result(path, row, col, resolution_x, resolution_y, is_topdown_one_texture))
 
-    @Slot(str)
-    def generateSDFAsync(self, path):
-        self._run_generation("sdf", generate_sdf_result, path)
+    @Slot(str, int, int)
+    def generateSDFAsync(self, path, threshold, spread):
+        self._run_generation("sdf", generate_sdf_result, path, round(threshold / 100 * 255), float(spread))
 
     @Slot(str, int, int, int, int, bool)
     def generateAtlasAsync(self, path, row, col, resolution_x, resolution_y, is_topdown_one_texture):
