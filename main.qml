@@ -327,6 +327,8 @@ Window {
     onSingleTopBottomChanged: Qt.callLater(refreshAtlasInspection)
     onSelectedFrameChanged: scheduleSdfPreview()
     onModeChanged: scheduleSdfPreview()
+    onThresholdChanged: scheduleSdfPreview()
+    onSpreadChanged: scheduleSdfPreview()
 
     Timer {
         id: sdfPreviewTimer
