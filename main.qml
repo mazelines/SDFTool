@@ -954,7 +954,7 @@ Window {
                                     titleText: uiText("sdfSettings")
                                     iconText: "\u2699"
                                     FieldLabel { textValue: uiText("algorithm") }
-                                    SelectRow { valueText: "8SSEDT"; badgeText: uiText("cppCore"); badgeColor: blue }
+                                    SelectRow { valueText: "JFA"; badgeText: "GPU"; badgeColor: blue }
                                     FieldLabel { textValue: uiText("distanceSpread"); valueText: root.spread + " px"; topPadding: 13 }
                                     Slider {
                                         width: parent.width - 28
