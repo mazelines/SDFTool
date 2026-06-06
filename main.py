@@ -251,7 +251,9 @@ def generate_sdf_preview_result(image_path, threshold, spread):
         return {"ok": False, "error": "Invalid preview source", "outputFile": "", "outputUrl": ""}
 
     source_path = Path(image_path).resolve()
-    key = hashlib.sha1(f"{source_path}:{os.path.getmtime(source_path)}".encode("utf-8")).hexdigest()[:16]
+    key = hashlib.sha1(
+        f"{source_path}:{os.path.getmtime(source_path)}:t{threshold}:s{spread}".encode("utf-8")
+    ).hexdigest()[:16]
     work_dir = preview_cache_dir() / key
     work_dir.mkdir(parents=True, exist_ok=True)
     preview_source = work_dir / f"preview{source_path.suffix.lower()}"
