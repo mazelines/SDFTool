@@ -959,7 +959,7 @@ Window {
                                     Slider {
                                         width: parent.width - 28
                                         from: 2
-                                        to: 64
+                                        to: 256
                                         value: root.spread
                                         onMoved: root.spread = Math.round(value)
                                         background: SliderTrack { control: parent }
