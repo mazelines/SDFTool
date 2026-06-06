@@ -37,6 +37,7 @@ if dll_dir.exists():
 sys.path.append(str(base_dir))
 sys.path.append(str(base_dir / "Cpp_Core" / "x64" / "Release"))
 import SDF_Cpp
+import sdf_backend
 
 
 
@@ -252,15 +253,20 @@ def generate_sdf_preview_result(image_path, threshold, spread):
 
     if not output_file.exists():
         shutil.copy2(source_path, preview_source)
-        sdf_folder = SDF_Cpp.GenerateSDF(str(work_dir), preview_source.name)
-        if sdf_folder and str(sdf_folder).strip():
-            SDF_Cpp.SDFLerp(sdf_folder)
-            candidate = Path(sdf_folder) / f"{preview_source.stem}.png"
-            if not candidate.exists():
-                candidate = Path(sdf_folder) / "SDF" / "SDF.png"
-            if candidate.exists() and candidate.resolve() != output_file.resolve():
-                output_file.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(candidate, output_file)
+        gray = cv2.imread(str(preview_source), cv2.IMREAD_GRAYSCALE)
+        if gray is None:
+            return {"ok": False, "error": "프리뷰 이미지 읽기 실패", "outputFile": "", "outputUrl": ""}
+        threshold_255 = round(threshold / 100 * 255)
+        sdf = sdf_backend.generate_distance_field(gray, threshold_255, float(spread))
+        out_dir = work_dir / "output"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(out_dir / f"{preview_source.stem}.png"), sdf)
+        sdf_folder = str(out_dir) + os.sep
+        SDF_Cpp.SDFLerp(sdf_folder)
+        candidate = out_dir / f"{preview_source.stem}.png"
+        if candidate.exists() and candidate.resolve() != output_file.resolve():
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(candidate, output_file)
 
     if not output_file.exists():
         return {"ok": False, "error": "SDF preview generation failed", "outputFile": "", "outputUrl": ""}
