@@ -367,6 +367,20 @@ Window {
         color: root.bg
         flags: Qt.Window
 
+        // 메인 창 오른쪽에 도킹: 우측 가장자리에 붙이고 높이를 맞춤.
+        function dockToMain() {
+            var dockW = 600
+            var x = root.x + root.width
+            var screenW = Screen.desktopAvailableWidth
+            if (x + dockW > screenW) {
+                x = Math.max(0, screenW - dockW)  // 화면 밖이면 우측 끝에 맞춤
+            }
+            sdfResultWindow.x = x
+            sdfResultWindow.y = root.y
+            sdfResultWindow.width = dockW
+            sdfResultWindow.height = root.height
+        }
+
         Rectangle {
             anchors.fill: parent
             color: root.bg
@@ -431,6 +445,7 @@ Window {
                     if (root.sdfOutputUrl !== "") {
                         sdfResultWindow.resultFile = result.sdfOutput || ""
                         sdfResultWindow.baseFile = result.sdfOutput || ""
+                        sdfResultWindow.dockToMain()
                         sdfResultWindow.show()
                         sdfResultWindow.raise()
                         sdfResultWindow.requestActivate()
