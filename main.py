@@ -56,7 +56,8 @@ class SDFLib:
                 gray = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
                 if gray is None:
                     continue
-                sdf = sdf_backend.generate_distance_field(gray, threshold_255, float(spread))
+                # threshold는 프리뷰 전용(카툰 컷오프 라인). 저장 SDF는 128 이진화 고정.
+                sdf = sdf_backend.generate_distance_field(gray, 128, float(spread))
                 os.makedirs(out_dir, exist_ok=True)
                 cv2.imwrite(os.path.join(out_dir, filename), sdf)
                 output_folder = out_dir + os.sep
@@ -246,44 +247,59 @@ def preview_cache_dir():
     return path
 
 
+def _draw_cutoff_overlay(sdf_gray, threshold):
+    """부드러운 SDF 위에 threshold 레벨의 카툰(셀셰이딩) 컷오프 등고선을 강조색으로 합성.
+
+    표시 전용. 저장 SDF는 건드리지 않는다. threshold 0~100 -> 회색 레벨 0~255.
+    레벨 128(=threshold 50)이 실제 도형 경계, 올리면 안쪽/내리면 바깥으로 라인 이동.
+    """
+    level = int(round(threshold / 100 * 255))
+    mask = (sdf_gray >= level).astype(np.uint8) * 255
+    kernel = np.ones((3, 3), np.uint8)
+    edge = cv2.morphologyEx(mask, cv2.MORPH_GRADIENT, kernel)
+    edge = cv2.dilate(edge, kernel)  # 가시성 위해 ~2-3px 두께
+    composite = cv2.cvtColor(sdf_gray, cv2.COLOR_GRAY2BGR)
+    composite[edge > 0] = (62, 136, 240)  # accent #f0883e (BGR)
+    return composite
+
+
 def generate_sdf_preview_result(image_path, threshold, spread):
     if not image_path or not os.path.isfile(image_path):
         return {"ok": False, "error": "Invalid preview source", "outputFile": "", "outputUrl": ""}
 
     source_path = Path(image_path).resolve()
-    key = hashlib.sha1(
-        f"{source_path}:{os.path.getmtime(source_path)}:t{threshold}:s{spread}".encode("utf-8")
+    # 저장 SDF는 source+spread 에만 의존(threshold는 표시 전용 컷오프 라인).
+    sdf_key = hashlib.sha1(
+        f"{source_path}:{os.path.getmtime(source_path)}:s{spread}".encode("utf-8")
     ).hexdigest()[:16]
-    work_dir = preview_cache_dir() / key
+    work_dir = preview_cache_dir() / sdf_key
     work_dir.mkdir(parents=True, exist_ok=True)
     preview_source = work_dir / f"preview{source_path.suffix.lower()}"
-    output_file = work_dir / "output" / f"{preview_source.stem}.png"
+    sdf_file = work_dir / "sdf.png"
 
-    if not output_file.exists():
+    # 부드러운 SDF는 (source, spread)당 1회만 생성(이진화 128 고정).
+    if not sdf_file.exists():
         shutil.copy2(source_path, preview_source)
         gray = cv2.imread(str(preview_source), cv2.IMREAD_GRAYSCALE)
         if gray is None:
             return {"ok": False, "error": "프리뷰 이미지 읽기 실패", "outputFile": "", "outputUrl": ""}
-        threshold_255 = round(threshold / 100 * 255)
-        sdf = sdf_backend.generate_distance_field(gray, threshold_255, float(spread))
-        out_dir = work_dir / "output"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        cv2.imwrite(str(out_dir / f"{preview_source.stem}.png"), sdf)
-        sdf_folder = str(out_dir) + os.sep
-        SDF_Cpp.SDFLerp(sdf_folder)
-        candidate = out_dir / f"{preview_source.stem}.png"
-        if candidate.exists() and candidate.resolve() != output_file.resolve():
-            output_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(candidate, output_file)
+        sdf = sdf_backend.generate_distance_field(gray, 128, float(spread))
+        cv2.imwrite(str(sdf_file), sdf)
 
-    if not output_file.exists():
+    sdf = cv2.imread(str(sdf_file), cv2.IMREAD_GRAYSCALE)
+    if sdf is None:
         return {"ok": False, "error": "SDF preview generation failed", "outputFile": "", "outputUrl": ""}
+
+    # threshold별 카툰 컷오프 라인 합성(표시 전용, GPU 재계산 불필요).
+    display_file = work_dir / f"display_t{int(threshold)}.png"
+    if not display_file.exists():
+        cv2.imwrite(str(display_file), _draw_cutoff_overlay(sdf, threshold))
 
     return {
         "ok": True,
         "error": "",
-        "outputFile": str(output_file),
-        "outputUrl": path_to_url(output_file),
+        "outputFile": str(display_file),
+        "outputUrl": path_to_url(display_file),
     }
 
 
