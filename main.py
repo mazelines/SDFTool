@@ -303,6 +303,20 @@ def generate_sdf_preview_result(image_path, threshold, spread):
     }
 
 
+def generate_cutoff_overlay_result(image_path, threshold):
+    """이미 만들어진 SDF 이미지(예: 생성 결과 SDF.png) 위에 카툰 컷오프 라인을 합성."""
+    if not image_path or not os.path.isfile(image_path):
+        return {"ok": False, "error": "Invalid image", "outputUrl": ""}
+    gray = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    if gray is None:
+        return {"ok": False, "error": "이미지 읽기 실패", "outputUrl": ""}
+    src = Path(image_path)
+    out_file = src.with_name(f"{src.stem}_cutoff_t{int(threshold)}.png")
+    if not out_file.exists():
+        cv2.imwrite(str(out_file), _draw_cutoff_overlay(gray, threshold))
+    return {"ok": True, "error": "", "outputUrl": path_to_url(out_file)}
+
+
 def generate_sdf_result(path, threshold_255, spread):
     if not path or not os.path.isdir(path):
         return {
@@ -407,6 +421,13 @@ class FuncForQml(QObject):
             return result_json(generate_sdf_preview_result(image_path, threshold, spread))
         except Exception as exc:
             return result_json({"ok": False, "error": str(exc), "outputFile": "", "outputUrl": ""})
+
+    @Slot(str, int, result=str)
+    def cutoffOverlay(self, image_path, threshold):
+        try:
+            return result_json(generate_cutoff_overlay_result(image_path, threshold))
+        except Exception as exc:
+            return result_json({"ok": False, "error": str(exc), "outputUrl": ""})
 
     @Slot(str, int, int, result=str)
     def generateSDF(self, path, threshold, spread):

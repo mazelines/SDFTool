@@ -290,13 +290,17 @@ Window {
     }
 
     function scheduleSdfPreview() {
-        if (root.mode !== "sdf" || selectedImagePath() === "" || typeof pyFunc === "undefined" || pyFunc === null) {
+        if (typeof pyFunc === "undefined" || pyFunc === null) {
             return
         }
-        sdfPreviewTimer.restart()
+        // 라이브 프리뷰(소스 선택+SDF 모드) 또는 결과 창이 열려 있을 때 갱신.
+        if ((root.mode === "sdf" && selectedImagePath() !== "") || sdfResultWindow.visible) {
+            sdfPreviewTimer.restart()
+        }
     }
 
     function refreshSdfPreview() {
+        refreshSdfResultWindow()
         var pathValue = selectedImagePath()
         if (pathValue === "" || typeof pyFunc === "undefined" || pyFunc === null) {
             root.sdfPreviewUrl = ""
@@ -306,6 +310,17 @@ Window {
         if (result.ok && result.outputUrl) {
             root.sdfPreviewRevision += 1
             root.sdfPreviewUrl = result.outputUrl + "?v=" + root.sdfPreviewRevision
+        }
+    }
+
+    function refreshSdfResultWindow() {
+        if (!sdfResultWindow.visible || sdfResultWindow.baseFile === "" || typeof pyFunc === "undefined" || pyFunc === null) {
+            return
+        }
+        var r = parseJsonResult(pyFunc.cutoffOverlay(sdfResultWindow.baseFile, root.threshold))
+        if (r.ok && r.outputUrl) {
+            sdfResultWindow.revision += 1
+            sdfResultWindow.resultUrl = r.outputUrl + "?v=" + sdfResultWindow.revision
         }
     }
 
@@ -342,6 +357,8 @@ Window {
         id: sdfResultWindow
         property string resultUrl: ""
         property string resultFile: ""
+        property string baseFile: ""
+        property int revision: 0
         width: 760
         height: 800
         minimumWidth: 360
@@ -413,10 +430,11 @@ Window {
                     root.statusText = uiText("sdfOutput")
                     if (root.sdfOutputUrl !== "") {
                         sdfResultWindow.resultFile = result.sdfOutput || ""
-                        sdfResultWindow.resultUrl = root.sdfOutputUrl
+                        sdfResultWindow.baseFile = result.sdfOutput || ""
                         sdfResultWindow.show()
                         sdfResultWindow.raise()
                         sdfResultWindow.requestActivate()
+                        root.refreshSdfResultWindow()
                     }
                 } else {
                     root.statusText = uiText("generationFailed") + ": " + translatedStatus(result.error)
