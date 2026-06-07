@@ -286,20 +286,15 @@ def generate_sdf_preview_result(image_path, threshold, spread):
         sdf = sdf_backend.generate_distance_field(gray, 128, float(spread))
         cv2.imwrite(str(sdf_file), sdf)
 
-    sdf = cv2.imread(str(sdf_file), cv2.IMREAD_GRAYSCALE)
-    if sdf is None:
+    if not sdf_file.exists():
         return {"ok": False, "error": "SDF preview generation failed", "outputFile": "", "outputUrl": ""}
 
-    # threshold별 카툰 컷오프 라인 합성(표시 전용, GPU 재계산 불필요).
-    display_file = work_dir / f"display_t{int(threshold)}.png"
-    if not display_file.exists():
-        cv2.imwrite(str(display_file), _draw_cutoff_overlay(sdf, threshold))
-
+    # 라이브 프리뷰는 순수 SDF만 표시(threshold 컷오프 라인은 결과 창에서만).
     return {
         "ok": True,
         "error": "",
-        "outputFile": str(display_file),
-        "outputUrl": path_to_url(display_file),
+        "outputFile": str(sdf_file),
+        "outputUrl": path_to_url(sdf_file),
     }
 
 
