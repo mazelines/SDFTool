@@ -188,7 +188,8 @@ Window {
     }
 
     function sdfResultPreviewUrl() {
-        return root.sdfOutputUrl !== "" ? root.sdfOutputUrl : root.sdfPreviewUrl
+        // 생성 결과는 별도 결과 창에 표시. 메인 프리뷰는 항상 라이브 프리뷰만.
+        return root.sdfPreviewUrl
     }
 
     function isPlaceholderPath(pathValue) {
@@ -337,6 +338,56 @@ Window {
         onTriggered: root.refreshSdfPreview()
     }
 
+    Window {
+        id: sdfResultWindow
+        property string resultUrl: ""
+        property string resultFile: ""
+        width: 760
+        height: 800
+        minimumWidth: 360
+        minimumHeight: 360
+        title: uiText("sdfOutput") + (resultFile !== "" ? "  -  " + resultFile.split(/[\\/]/).pop() : "")
+        color: root.bg
+        flags: Qt.Window
+
+        Rectangle {
+            anchors.fill: parent
+            color: root.bg
+
+            Rectangle {
+                id: sdfResultHeader
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: 40
+                color: root.win
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 14
+                    anchors.right: parent.right
+                    anchors.rightMargin: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: sdfResultWindow.resultFile !== "" ? sdfResultWindow.resultFile : uiText("sdfOutput")
+                    color: root.dim
+                    font.pixelSize: 12
+                    elide: Text.ElideMiddle
+                }
+            }
+
+            Image {
+                anchors.top: sdfResultHeader.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: 12
+                source: sdfResultWindow.resultUrl
+                fillMode: Image.PreserveAspectFit
+                smooth: false
+                cache: false
+            }
+        }
+    }
+
     Connections {
         target: typeof pyFunc === "undefined" ? null : pyFunc
         function onTranslationReady(source, language, translated) {
@@ -360,6 +411,13 @@ Window {
                     root.sdfOutputRevision += 1
                     root.sdfOutputUrl = result.sdfOutputUrl ? result.sdfOutputUrl + "?v=" + root.sdfOutputRevision : ""
                     root.statusText = uiText("sdfOutput")
+                    if (root.sdfOutputUrl !== "") {
+                        sdfResultWindow.resultFile = result.sdfOutput || ""
+                        sdfResultWindow.resultUrl = root.sdfOutputUrl
+                        sdfResultWindow.show()
+                        sdfResultWindow.raise()
+                        sdfResultWindow.requestActivate()
+                    }
                 } else {
                     root.statusText = uiText("generationFailed") + ": " + translatedStatus(result.error)
                 }
