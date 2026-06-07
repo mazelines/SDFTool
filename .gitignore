@@ -81,3 +81,5 @@ design_handoff_sdftool/*
 !design_handoff_sdftool/assets/**
 
 .omc/
+
+*.log
