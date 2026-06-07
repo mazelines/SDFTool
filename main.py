@@ -37,6 +37,7 @@ if dll_dir.exists():
 sys.path.append(str(base_dir))
 sys.path.append(str(base_dir / "Cpp_Core" / "x64" / "Release"))
 import SDF_Cpp
+import sdf_backend
 
 
 
@@ -45,19 +46,26 @@ class SDFLib:
         super().__init__(parent)
 
     @staticmethod
-    def SDF_Generate(folder_path):
+    def SDF_Generate(folder_path, threshold_255, spread):
         output_folder = ""
+        out_dir = os.path.join(folder_path, "output")
         for filename in os.listdir(folder_path):
             file_path = os.path.join(folder_path, filename)
             # 检查文件是否是图像文件
             if os.path.isfile(file_path) and filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp')):
-                image = cv2.imread(file_path)
-                output_folder = SDF_Cpp.GenerateSDF(folder_path, filename)
+                gray = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+                if gray is None:
+                    continue
+                # threshold는 프리뷰 전용(카툰 컷오프 라인). 저장 SDF는 128 이진화 고정.
+                sdf = sdf_backend.generate_distance_field(gray, 128, float(spread))
+                os.makedirs(out_dir, exist_ok=True)
+                cv2.imwrite(os.path.join(out_dir, filename), sdf)
+                output_folder = out_dir + os.sep
         return output_folder
 
     @staticmethod
-    def lerp_SDF(folder_path):
-        sdf_folder = SDFLib.SDF_Generate(folder_path)
+    def lerp_SDF(folder_path, threshold_255, spread):
+        sdf_folder = SDFLib.SDF_Generate(folder_path, threshold_255, spread)
         if sdf_folder.strip() != "":
             print("SDF生成完成")
             SDF_Cpp.SDFLerp(sdf_folder)
@@ -239,41 +247,72 @@ def preview_cache_dir():
     return path
 
 
+def _draw_cutoff_overlay(sdf_gray, threshold):
+    """부드러운 SDF 위에 threshold 레벨의 카툰(셀셰이딩) 컷오프 등고선을 강조색으로 합성.
+
+    표시 전용. 저장 SDF는 건드리지 않는다. threshold 0~100 -> 회색 레벨 0~255.
+    레벨 128(=threshold 50)이 실제 도형 경계, 올리면 안쪽/내리면 바깥으로 라인 이동.
+    """
+    level = int(round(threshold / 100 * 255))
+    mask = (sdf_gray >= level).astype(np.uint8) * 255
+    kernel = np.ones((3, 3), np.uint8)
+    edge = cv2.morphologyEx(mask, cv2.MORPH_GRADIENT, kernel)
+    edge = cv2.dilate(edge, kernel)  # 가시성 위해 ~2-3px 두께
+    composite = cv2.cvtColor(sdf_gray, cv2.COLOR_GRAY2BGR)
+    composite[edge > 0] = (62, 136, 240)  # accent #f0883e (BGR)
+    return composite
+
+
 def generate_sdf_preview_result(image_path, threshold, spread):
     if not image_path or not os.path.isfile(image_path):
         return {"ok": False, "error": "Invalid preview source", "outputFile": "", "outputUrl": ""}
 
     source_path = Path(image_path).resolve()
-    key = hashlib.sha1(f"{source_path}:{os.path.getmtime(source_path)}".encode("utf-8")).hexdigest()[:16]
-    work_dir = preview_cache_dir() / key
+    # 저장 SDF는 source+spread 에만 의존(threshold는 표시 전용 컷오프 라인).
+    sdf_key = hashlib.sha1(
+        f"{source_path}:{os.path.getmtime(source_path)}:s{spread}".encode("utf-8")
+    ).hexdigest()[:16]
+    work_dir = preview_cache_dir() / sdf_key
     work_dir.mkdir(parents=True, exist_ok=True)
     preview_source = work_dir / f"preview{source_path.suffix.lower()}"
-    output_file = work_dir / "output" / f"{preview_source.stem}.png"
+    sdf_file = work_dir / "sdf.png"
 
-    if not output_file.exists():
+    # 부드러운 SDF는 (source, spread)당 1회만 생성(이진화 128 고정).
+    if not sdf_file.exists():
         shutil.copy2(source_path, preview_source)
-        sdf_folder = SDF_Cpp.GenerateSDF(str(work_dir), preview_source.name)
-        if sdf_folder and str(sdf_folder).strip():
-            SDF_Cpp.SDFLerp(sdf_folder)
-            candidate = Path(sdf_folder) / f"{preview_source.stem}.png"
-            if not candidate.exists():
-                candidate = Path(sdf_folder) / "SDF" / "SDF.png"
-            if candidate.exists() and candidate.resolve() != output_file.resolve():
-                output_file.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(candidate, output_file)
+        gray = cv2.imread(str(preview_source), cv2.IMREAD_GRAYSCALE)
+        if gray is None:
+            return {"ok": False, "error": "프리뷰 이미지 읽기 실패", "outputFile": "", "outputUrl": ""}
+        sdf = sdf_backend.generate_distance_field(gray, 128, float(spread))
+        cv2.imwrite(str(sdf_file), sdf)
 
-    if not output_file.exists():
+    if not sdf_file.exists():
         return {"ok": False, "error": "SDF preview generation failed", "outputFile": "", "outputUrl": ""}
 
+    # 라이브 프리뷰는 순수 SDF만 표시(threshold 컷오프 라인은 결과 창에서만).
     return {
         "ok": True,
         "error": "",
-        "outputFile": str(output_file),
-        "outputUrl": path_to_url(output_file),
+        "outputFile": str(sdf_file),
+        "outputUrl": path_to_url(sdf_file),
     }
 
 
-def generate_sdf_result(path):
+def generate_cutoff_overlay_result(image_path, threshold):
+    """이미 만들어진 SDF 이미지(예: 생성 결과 SDF.png) 위에 카툰 컷오프 라인을 합성."""
+    if not image_path or not os.path.isfile(image_path):
+        return {"ok": False, "error": "Invalid image", "outputUrl": ""}
+    gray = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    if gray is None:
+        return {"ok": False, "error": "이미지 읽기 실패", "outputUrl": ""}
+    src = Path(image_path)
+    out_file = src.with_name(f"{src.stem}_cutoff_t{int(threshold)}.png")
+    if not out_file.exists():
+        cv2.imwrite(str(out_file), _draw_cutoff_overlay(gray, threshold))
+    return {"ok": True, "error": "", "outputUrl": path_to_url(out_file)}
+
+
+def generate_sdf_result(path, threshold_255, spread):
     if not path or not os.path.isdir(path):
         return {
             "ok": False,
@@ -283,7 +322,7 @@ def generate_sdf_result(path):
             "sdfOutputUrl": "",
         }
 
-    output_folder = SDFLib.lerp_SDF(path)
+    output_folder = SDFLib.lerp_SDF(path, threshold_255, spread)
     sdf_output = ""
     if output_folder:
         candidate = Path(output_folder) / "SDF" / "SDF.png"
@@ -378,17 +417,24 @@ class FuncForQml(QObject):
         except Exception as exc:
             return result_json({"ok": False, "error": str(exc), "outputFile": "", "outputUrl": ""})
 
-    @Slot(str, result=str)
-    def generateSDF(self, path):
-        return result_json(generate_sdf_result(path))
+    @Slot(str, int, result=str)
+    def cutoffOverlay(self, image_path, threshold):
+        try:
+            return result_json(generate_cutoff_overlay_result(image_path, threshold))
+        except Exception as exc:
+            return result_json({"ok": False, "error": str(exc), "outputUrl": ""})
+
+    @Slot(str, int, int, result=str)
+    def generateSDF(self, path, threshold, spread):
+        return result_json(generate_sdf_result(path, round(threshold / 100 * 255), float(spread)))
 
     @Slot(str, int, int, int, int, bool, result=str)
     def generateAtlas(self, path, row, col, resolution_x, resolution_y, is_topdown_one_texture):
         return result_json(generate_atlas_result(path, row, col, resolution_x, resolution_y, is_topdown_one_texture))
 
-    @Slot(str)
-    def generateSDFAsync(self, path):
-        self._run_generation("sdf", generate_sdf_result, path)
+    @Slot(str, int, int)
+    def generateSDFAsync(self, path, threshold, spread):
+        self._run_generation("sdf", generate_sdf_result, path, round(threshold / 100 * 255), float(spread))
 
     @Slot(str, int, int, int, int, bool)
     def generateAtlasAsync(self, path, row, col, resolution_x, resolution_y, is_topdown_one_texture):

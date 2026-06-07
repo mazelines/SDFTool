@@ -188,7 +188,8 @@ Window {
     }
 
     function sdfResultPreviewUrl() {
-        return root.sdfOutputUrl !== "" ? root.sdfOutputUrl : root.sdfPreviewUrl
+        // 생성 결과는 별도 결과 창에 표시. 메인 프리뷰는 항상 라이브 프리뷰만.
+        return root.sdfPreviewUrl
     }
 
     function isPlaceholderPath(pathValue) {
@@ -289,13 +290,17 @@ Window {
     }
 
     function scheduleSdfPreview() {
-        if (root.mode !== "sdf" || selectedImagePath() === "" || typeof pyFunc === "undefined" || pyFunc === null) {
+        if (typeof pyFunc === "undefined" || pyFunc === null) {
             return
         }
-        sdfPreviewTimer.restart()
+        // 라이브 프리뷰(소스 선택+SDF 모드) 또는 결과 창이 열려 있을 때 갱신.
+        if ((root.mode === "sdf" && selectedImagePath() !== "") || sdfResultWindow.visible) {
+            sdfPreviewTimer.restart()
+        }
     }
 
     function refreshSdfPreview() {
+        refreshSdfResultWindow()
         var pathValue = selectedImagePath()
         if (pathValue === "" || typeof pyFunc === "undefined" || pyFunc === null) {
             root.sdfPreviewUrl = ""
@@ -308,9 +313,20 @@ Window {
         }
     }
 
+    function refreshSdfResultWindow() {
+        if (!sdfResultWindow.visible || sdfResultWindow.baseFile === "" || typeof pyFunc === "undefined" || pyFunc === null) {
+            return
+        }
+        var r = parseJsonResult(pyFunc.cutoffOverlay(sdfResultWindow.baseFile, root.threshold))
+        if (r.ok && r.outputUrl) {
+            sdfResultWindow.revision += 1
+            sdfResultWindow.resultUrl = r.outputUrl + "?v=" + sdfResultWindow.revision
+        }
+    }
+
     function handleGenerateSdf() {
         if (!canGenerate()) return
-        pyFunc.generateSDFAsync(root.sdfPath)
+        pyFunc.generateSDFAsync(root.sdfPath, root.threshold, root.spread)
     }
 
     function handleGenerateAtlas() {
@@ -327,12 +343,80 @@ Window {
     onSingleTopBottomChanged: Qt.callLater(refreshAtlasInspection)
     onSelectedFrameChanged: scheduleSdfPreview()
     onModeChanged: scheduleSdfPreview()
+    onThresholdChanged: scheduleSdfPreview()
+    onSpreadChanged: scheduleSdfPreview()
 
     Timer {
         id: sdfPreviewTimer
         interval: 120
         repeat: false
         onTriggered: root.refreshSdfPreview()
+    }
+
+    Window {
+        id: sdfResultWindow
+        property string resultUrl: ""
+        property string resultFile: ""
+        property string baseFile: ""
+        property int revision: 0
+        width: 760
+        height: 800
+        minimumWidth: 360
+        minimumHeight: 360
+        title: uiText("sdfOutput") + (resultFile !== "" ? "  -  " + resultFile.split(/[\\/]/).pop() : "")
+        color: root.bg
+        flags: Qt.Window
+
+        // 메인 창 오른쪽에 도킹: 우측 가장자리에 붙이고 높이를 맞춤.
+        function dockToMain() {
+            var dockW = 600
+            var x = root.x + root.width
+            var screenW = Screen.desktopAvailableWidth
+            if (x + dockW > screenW) {
+                x = Math.max(0, screenW - dockW)  // 화면 밖이면 우측 끝에 맞춤
+            }
+            sdfResultWindow.x = x
+            sdfResultWindow.y = root.y
+            sdfResultWindow.width = dockW
+            sdfResultWindow.height = root.height
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            color: root.bg
+
+            Rectangle {
+                id: sdfResultHeader
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: 40
+                color: root.win
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 14
+                    anchors.right: parent.right
+                    anchors.rightMargin: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: sdfResultWindow.resultFile !== "" ? sdfResultWindow.resultFile : uiText("sdfOutput")
+                    color: root.dim
+                    font.pixelSize: 12
+                    elide: Text.ElideMiddle
+                }
+            }
+
+            Image {
+                anchors.top: sdfResultHeader.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: 12
+                source: sdfResultWindow.resultUrl
+                fillMode: Image.PreserveAspectFit
+                smooth: false
+                cache: false
+            }
+        }
     }
 
     Connections {
@@ -358,6 +442,15 @@ Window {
                     root.sdfOutputRevision += 1
                     root.sdfOutputUrl = result.sdfOutputUrl ? result.sdfOutputUrl + "?v=" + root.sdfOutputRevision : ""
                     root.statusText = uiText("sdfOutput")
+                    if (root.sdfOutputUrl !== "") {
+                        sdfResultWindow.resultFile = result.sdfOutput || ""
+                        sdfResultWindow.baseFile = result.sdfOutput || ""
+                        sdfResultWindow.dockToMain()
+                        sdfResultWindow.show()
+                        sdfResultWindow.raise()
+                        sdfResultWindow.requestActivate()
+                        root.refreshSdfResultWindow()
+                    }
                 } else {
                     root.statusText = uiText("generationFailed") + ": " + translatedStatus(result.error)
                 }
@@ -954,12 +1047,12 @@ Window {
                                     titleText: uiText("sdfSettings")
                                     iconText: "\u2699"
                                     FieldLabel { textValue: uiText("algorithm") }
-                                    SelectRow { valueText: "8SSEDT"; badgeText: uiText("cppCore"); badgeColor: blue }
+                                    SelectRow { valueText: "JFA"; badgeText: "GPU"; badgeColor: blue }
                                     FieldLabel { textValue: uiText("distanceSpread"); valueText: root.spread + " px"; topPadding: 13 }
                                     Slider {
                                         width: parent.width - 28
                                         from: 2
-                                        to: 64
+                                        to: 256
                                         value: root.spread
                                         onMoved: root.spread = Math.round(value)
                                         background: SliderTrack { control: parent }
