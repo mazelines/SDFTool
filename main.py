@@ -1,4 +1,5 @@
 # This Python file uses the following encoding: utf-8
+__version__ = "1.0.0"
 import os
 import sys
 import json
@@ -21,6 +22,7 @@ os.environ.setdefault("QT_QUICK_BACKEND", "software")
 from PySide6.QtCore import QObject, Signal, Slot
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtWidgets import QFileDialog, QApplication
+from updater import UpdateChecker
 
 _dll_dir_handles = []
 
@@ -382,10 +384,27 @@ class FuncForQml(QObject):
     translationReady = Signal(str, str, str)
     generationStarted = Signal(str)
     generationFinished = Signal(str, str)
+    updateAvailable = Signal(str, str)   # remote_version, download_url
+    upToDate = Signal(str)              # version (manual check only)
+    updateFailed = Signal(str)          # error message (manual check only)
 
     def __init__(self, localization, parent=None):
         super().__init__(parent)
         self.localization = localization
+        self._checker = None
+
+    def startAutoUpdateCheck(self) -> None:
+        self._checker = UpdateChecker(__version__, notify_up_to_date=False)
+        self._checker.updateAvailable.connect(self.updateAvailable)
+        self._checker.start()
+
+    @Slot()
+    def checkForUpdate(self) -> None:
+        self._checker = UpdateChecker(__version__, notify_up_to_date=True)
+        self._checker.updateAvailable.connect(self.updateAvailable)
+        self._checker.upToDate.connect(self.upToDate)
+        self._checker.failed.connect(self.updateFailed)
+        self._checker.start()
 
     @Slot(result=str)
     def selectPath(self):
@@ -469,10 +488,13 @@ if __name__ == "__main__":
     localization = Localization(base_dir / "localization_cache.json")
     pyFunc = FuncForQml(localization)
     engine.rootContext().setContextProperty("pyFunc", pyFunc)
+    engine.rootContext().setContextProperty("appVersion", __version__)
 
     qml_file = base_dir / "main.qml"
     engine.load(qml_file)
 
     if not engine.rootObjects():
         sys.exit(-1)
+
+    pyFunc.startAutoUpdateCheck()
     sys.exit(app.exec())

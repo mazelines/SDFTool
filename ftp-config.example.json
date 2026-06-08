@@ -1,0 +1,11 @@
+{
+  "host": "mazeline.tech",
+  "user": "mazeline",
+  "password": "YOUR_FTP_PASSWORD_HERE",
+  "remotePath": "/updates/sdftool/",
+  "secure": false,
+  "uploads": [
+    "dist/SDFTool.zip",
+    "dist/latest.yml"
+  ]
+}

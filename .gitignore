@@ -83,3 +83,8 @@ design_handoff_sdftool/*
 .omc/
 
 *.log
+
+# FTP 배포 설정 (자격증명 포함 - 절대 커밋 금지)
+ftp-config.json
+
+ftp-config.example.json

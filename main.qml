@@ -519,16 +519,37 @@ Window {
                         font.weight: Font.DemiBold
                     }
 
-                    Repeater {
-                        model: ["file", "edit", "view", "tools", "help"]
-                        delegate: Text {
-                            text: uiText(modelData)
-                            color: dim
-                            font.pixelSize: 12
-                            leftPadding: 8
-                            rightPadding: 8
-                            verticalAlignment: Text.AlignVCenter
-                            Layout.preferredHeight: 38
+                    Text {
+                        text: uiText("help")
+                        color: dim
+                        font.pixelSize: 12
+                        leftPadding: 8
+                        rightPadding: 8
+                        verticalAlignment: Text.AlignVCenter
+                        Layout.preferredHeight: 38
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: helpMenu.popup()
+                        }
+                    }
+
+                    Menu {
+                        id: helpMenu
+                        readonly property string docsUrl: "https://www.mazeline.tech/blogs/SDFTool_Usage_Guide/"
+
+                        MenuItem {
+                            text: "사용법 문서"
+                            onTriggered: Qt.openUrlExternally(helpMenu.docsUrl)
+                        }
+                        MenuItem {
+                            text: "업데이트 확인"
+                            onTriggered: pyFunc.checkForUpdate()
+                        }
+                        MenuSeparator {}
+                        MenuItem {
+                            text: "MAZELINE 홈페이지"
+                            onTriggered: Qt.openUrlExternally("https://mazeline.tech")
                         }
                     }
 
@@ -1250,6 +1271,258 @@ Window {
                     }
                 }
             }
+
+            // \u2500\u2500 Mazeline \uc790\uc0ac \uad11\uace0 \ubc30\ub108 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 150
+                color: "#09090d"
+                clip: true
+
+                // \uadf8\ub9ac\ub4dc \uc2e0\uacbd\ub9dd \uc560\ub2c8\uba54\uc774\uc158 \ubc30\uacbd
+                Canvas {
+                    id: gridCanvas
+                    anchors.fill: parent
+                    opacity: 0.2
+
+                    property real t: 0
+                    NumberAnimation on t {
+                        from: 0; to: 100
+                        duration: 40000
+                        loops: Animation.Infinite
+                        running: true
+                        easing.type: Easing.Linear
+                    }
+                    onTChanged: requestPaint()
+
+                    onPaint: {
+                        var ctx = getContext("2d");
+                        ctx.clearRect(0, 0, width, height);
+
+                        var gs = 13;           // \uc18c\ud615 \uc140 \ud06c\uae30
+                        var major = 5;         // \ub300\ud615 \uadf8\ub9ac\ub4dc \uac04\uaca9 (\uc140 \uc218)
+                        var ms = gs * major;   // \ub300\ud615 \uc140 \ud06c\uae30
+                        var cLen = 5;          // \ud06c\ub85c\uc2a4\ub9c8\ud06c \uae38\uc774
+
+                        var cols = Math.ceil(width  / gs) + 1;
+                        var rows = Math.ceil(height / gs) + 1;
+                        var mcols = Math.ceil(width  / ms) + 2;
+                        var mrows = Math.ceil(height / ms) + 2;
+
+                        // \ubbf8\uc138 \uadf8\ub9ac\ub4dc \ub77c\uc778
+                        ctx.strokeStyle = "rgba(255,255,255,0.05)";
+                        ctx.lineWidth = 0.5;
+                        for (var i = 0; i < cols; i++) {
+                            ctx.beginPath(); ctx.moveTo(i * gs, 0); ctx.lineTo(i * gs, height); ctx.stroke();
+                        }
+                        for (var j = 0; j < rows; j++) {
+                            ctx.beginPath(); ctx.moveTo(0, j * gs); ctx.lineTo(width, j * gs); ctx.stroke();
+                        }
+
+                        // \ub300\ud615 \uadf8\ub9ac\ub4dc \ub77c\uc778
+                        ctx.strokeStyle = "rgba(255,255,255,0.16)";
+                        ctx.lineWidth = 0.8;
+                        for (var mi = 0; mi < mcols; mi++) {
+                            ctx.beginPath(); ctx.moveTo(mi * ms, 0); ctx.lineTo(mi * ms, height); ctx.stroke();
+                        }
+                        for (var mj = 0; mj < mrows; mj++) {
+                            ctx.beginPath(); ctx.moveTo(0, mj * ms); ctx.lineTo(width, mj * ms); ctx.stroke();
+                        }
+
+                        // \ub300\ud615 \uad50\ucc28\uc810: \ud06c\ub85c\uc2a4\ub9c8\ud06c + \ub178\ub4dc \ud65c\uc131\ud654
+                        for (var ni = 0; ni < mcols; ni++) {
+                            for (var nj = 0; nj < mrows; nj++) {
+                                var nx = ni * ms;
+                                var ny = nj * ms;
+
+                                // \ud06c\ub85c\uc2a4\ub9c8\ud06c
+                                ctx.strokeStyle = "rgba(255,255,255,0.38)";
+                                ctx.lineWidth = 1;
+                                ctx.beginPath(); ctx.moveTo(nx - cLen, ny); ctx.lineTo(nx + cLen, ny); ctx.stroke();
+                                ctx.beginPath(); ctx.moveTo(nx, ny - cLen); ctx.lineTo(nx, ny + cLen); ctx.stroke();
+
+                                // \ub178\ub4dc \ud65c\uc131\ud654 (\uc0ac\uc778\ud30c \uae30\ubc18 \ud30c\uae09)
+                                var act = Math.sin(t * 0.9 + ni * 1.4 + nj * 1.9) * 0.5 + 0.5;
+                                if (act > 0.55) {
+                                    var alpha = (act - 0.55) / 0.45;
+                                    // \uc624\ub80c\uc9c0 \uae00\ub85c\uc6b0
+                                    var glow = ctx.createRadialGradient(nx, ny, 0, nx, ny, ms * 0.5);
+                                    glow.addColorStop(0, "rgba(240,136,62," + (alpha * 0.35) + ")");
+                                    glow.addColorStop(1, "rgba(0,0,0,0)");
+                                    ctx.fillStyle = glow;
+                                    ctx.fillRect(nx - ms * 0.5, ny - ms * 0.5, ms, ms);
+
+                                    // \ub178\ub4dc \uc810
+                                    ctx.fillStyle = "rgba(255,180,100," + alpha + ")";
+                                    ctx.beginPath();
+                                    ctx.arc(nx, ny, 2 + alpha * 1.5, 0, Math.PI * 2);
+                                    ctx.fill();
+
+                                    // \uc778\uc811 \uc5f0\uacb0\uc120 \ud65c\uc131\ud654
+                                    if (ni + 1 < mcols) {
+                                        var act2 = Math.sin(t * 0.9 + (ni+1) * 1.4 + nj * 1.9) * 0.5 + 0.5;
+                                        if (act2 > 0.55) {
+                                            var lineAlpha = Math.min(alpha, (act2 - 0.55) / 0.45) * 0.5;
+                                            ctx.strokeStyle = "rgba(240,136,62," + lineAlpha + ")";
+                                            ctx.lineWidth = 1;
+                                            ctx.beginPath();
+                                            ctx.moveTo(nx, ny);
+                                            ctx.lineTo(nx + ms, ny);
+                                            ctx.stroke();
+                                        }
+                                    }
+                                    if (nj + 1 < mrows) {
+                                        var act3 = Math.sin(t * 0.9 + ni * 1.4 + (nj+1) * 1.9) * 0.5 + 0.5;
+                                        if (act3 > 0.55) {
+                                            var lineAlpha2 = Math.min(alpha, (act3 - 0.55) / 0.45) * 0.5;
+                                            ctx.strokeStyle = "rgba(240,136,62," + lineAlpha2 + ")";
+                                            ctx.lineWidth = 1;
+                                            ctx.beginPath();
+                                            ctx.moveTo(nx, ny);
+                                            ctx.lineTo(nx, ny + ms);
+                                            ctx.stroke();
+                                        }
+                                    }
+                                }
+
+                                // \ubbf8\uc138 \uad50\ucc28\uc810 \uc18c\ud615 \uc810
+                                for (var si = 1; si < major; si++) {
+                                    for (var sj = 1; sj < major; sj++) {
+                                        var sx = nx + si * gs;
+                                        var sy = ny + sj * gs;
+                                        var sa = Math.sin(t * 1.3 + sx * 0.04 + sy * 0.06) * 0.5 + 0.5;
+                                        if (sa > 0.78) {
+                                            ctx.fillStyle = "rgba(255,255,255," + ((sa - 0.78) * 0.55) + ")";
+                                            ctx.beginPath();
+                                            ctx.arc(sx, sy, 1, 0, Math.PI * 2);
+                                            ctx.fill();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // \uc6b0\uce21 \ud398\uc774\ub4dc\uc544\uc6c3 (\ud14d\uc2a4\ud2b8 \uac00\ub3c5\uc131)
+                        var fadeGrad = ctx.createLinearGradient(0, 0, width, 0);
+                        fadeGrad.addColorStop(0,   "rgba(9,9,13,0)");
+                        fadeGrad.addColorStop(0.35, "rgba(9,9,13,0)");
+                        fadeGrad.addColorStop(0.7,  "rgba(9,9,13,0.5)");
+                        fadeGrad.addColorStop(1,    "rgba(9,9,13,0.85)");
+                        ctx.fillStyle = fadeGrad;
+                        ctx.fillRect(0, 0, width, height);
+                    }
+                }
+
+                // \ucf58\ud150\uce20 \uc624\ubc84\ub808\uc774
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 28
+                    anchors.rightMargin: 28
+                    spacing: 0
+
+                    Column {
+                        Layout.alignment: Qt.AlignVCenter
+                        spacing: 10
+
+                        Row {
+                            spacing: 12
+                            Rectangle {
+                                width: 42; height: 42; radius: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                gradient: Gradient {
+                                    GradientStop { position: 0.0; color: "#10233f" }
+                                    GradientStop { position: 0.55; color: "#7a808c" }
+                                    GradientStop { position: 1.0; color: "#f0883e" }
+                                }
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "M"
+                                    color: "#0c0f14"
+                                    font.pixelSize: 18
+                                    font.bold: true
+                                }
+                            }
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+                                Text {
+                                    text: "MAZELINE"
+                                    color: "#f0883e"
+                                    font.pixelSize: 22
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 1.5
+                                }
+                                Text {
+                                    text: "GAME TECH ART  \u00b7  CONSULTING"
+                                    color: "#5a606a"
+                                    font.pixelSize: 9
+                                    font.letterSpacing: 1.2
+                                    font.weight: Font.DemiBold
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "\ud53d\uc140 \ub108\uba38\uc758 \uae30\uc220\uc744 \uc124\uacc4\ud569\ub2c8\ub2e4"
+                            color: "#9aa1ad"
+                            font.pixelSize: 13
+                        }
+
+                        Text {
+                            text: "\uac8c\uc784 \uc81c\uc791\uacfc \ud14c\ud06c\ub2c8\uceec \uc544\ud2b8 \uc804\ubb38 \ucee8\uc124\ud305"
+                            color: "#5a606a"
+                            font.pixelSize: 11
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Rectangle {
+                        Layout.alignment: Qt.AlignVCenter
+                        width: 160; height: 38; radius: 8
+                        color: "#18f0883e"
+                        border.color: "#50f0883e"
+
+                        property bool hovered: false
+                        opacity: hovered ? 1.0 : 0.85
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: 8
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "mazeline.tech"
+                                color: "#f0883e"
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "\u2192"
+                                color: "#f0883e"
+                                font.pixelSize: 13
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            hoverEnabled: true
+                            onEntered: parent.hovered = true
+                            onExited: parent.hovered = false
+                            onClicked: Qt.openUrlExternally("https://mazeline.tech")
+                        }
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: Qt.openUrlExternally("https://mazeline.tech")
+                    z: -1
+                }
+            }
         }
     }
 
@@ -1472,6 +1745,279 @@ Window {
             font.pixelSize: 9
             font.weight: Font.DemiBold
             font.family: "IBM Plex Mono"
+        }
+    }
+
+    // ── 스플래시 화면 ─────────────────────────────────────────────────────
+    Rectangle {
+        id: splashOverlay
+        anchors.fill: parent
+        z: 1000
+        color: "#0f1115"
+        opacity: 0
+        visible: true
+
+        SequentialAnimation {
+            running: true
+            NumberAnimation {
+                target: splashOverlay; property: "opacity"
+                from: 0; to: 1; duration: 500; easing.type: Easing.OutCubic
+            }
+            PauseAnimation { duration: 1900 }
+            NumberAnimation {
+                target: splashOverlay; property: "opacity"
+                from: 1; to: 0; duration: 600; easing.type: Easing.InCubic
+            }
+            ScriptAction { script: splashOverlay.visible = false }
+        }
+
+        Column {
+            anchors.centerIn: parent
+            spacing: 0
+
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: 14
+
+                Rectangle {
+                    width: 44; height: 44
+                    radius: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    gradient: Gradient {
+                        GradientStop { position: 0.0; color: "#10233f" }
+                        GradientStop { position: 0.55; color: "#7a808c" }
+                        GradientStop { position: 1.0; color: "#f0883e" }
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        text: "SDF"
+                        color: "#0c0f14"
+                        font.pixelSize: 13
+                        font.bold: true
+                    }
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "SDFTool"
+                    color: "#d8dce3"
+                    font.pixelSize: 34
+                    font.weight: Font.DemiBold
+                }
+            }
+
+            Item { width: 1; height: 14 }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "v" + appVersion
+                color: "#7f8794"
+                font.pixelSize: 12
+                font.family: "IBM Plex Mono"
+            }
+
+            Item { width: 1; height: 36 }
+
+            Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: 220; height: 1
+                color: "#363c46"
+            }
+
+            Item { width: 1; height: 30 }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "픽셀 너머의 기술을 설계합니다"
+                color: "#9aa1ad"
+                font.pixelSize: 14
+            }
+
+            Item { width: 1; height: 10 }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "MAZELINE  ·  GAME TECH ART  ·  CONSULTING"
+                color: "#f0883e"
+                font.pixelSize: 10
+                font.weight: Font.DemiBold
+                font.letterSpacing: 1.2
+            }
+        }
+
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 24
+            text: "mazeline.tech"
+            color: "#3a404a"
+            font.pixelSize: 11
+        }
+
+        // 로딩 상태 메시지
+        Text {
+            id: loadingLabel
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 10
+            font.pixelSize: 10
+            color: "#5a606a"
+            font.family: "IBM Plex Mono"
+
+            property var messages: [
+                "모듈 초기화 중...",
+                "SDF 엔진 로드 중...",
+                "최적화 중입니다...",
+                "최적화 중입니다...",
+                "준비 완료"
+            ]
+            property int msgIdx: 0
+            text: messages[msgIdx]
+
+            Timer {
+                interval: 560
+                repeat: true
+                running: splashOverlay.visible
+                onTriggered: {
+                    if (loadingLabel.msgIdx < loadingLabel.messages.length - 1)
+                        loadingLabel.msgIdx++
+                }
+            }
+        }
+
+        Rectangle {
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 3
+            color: "#1a1e24"
+
+            Rectangle {
+                height: parent.height
+                radius: 1
+                color: "#f0883e"
+                NumberAnimation on width {
+                    from: 0
+                    to: splashOverlay.width
+                    duration: 2700
+                    running: true
+                    easing.type: Easing.InOutQuad
+                }
+            }
+        }
+    }
+
+    // ── 업데이트 결과 오버레이 ──────────────────────────────────────────────
+    Rectangle {
+        id: updateOverlay
+        anchors.fill: parent
+        visible: false
+        color: "#b0000000"
+        z: 999
+        property string titleText: ""
+        property string message: ""
+        property string downloadUrl: ""
+
+        MouseArea { anchors.fill: parent }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 340
+            height: col.implicitHeight + 56
+            radius: 10
+            color: panel
+            border.color: root.border
+
+            Column {
+                id: col
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                anchors.topMargin: 28
+                spacing: 14
+                width: 280
+
+                Text {
+                    width: parent.width
+                    text: updateOverlay.titleText
+                    color: accent
+                    font.pixelSize: 13
+                    font.weight: Font.DemiBold
+                    horizontalAlignment: Text.AlignHCenter
+                }
+                Text {
+                    width: parent.width
+                    text: updateOverlay.message
+                    color: root.text
+                    font.pixelSize: 12
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    lineHeight: 1.45
+                }
+                Row {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 8
+                    topPadding: 4
+
+                    Rectangle {
+                        visible: updateOverlay.downloadUrl !== ""
+                        width: 100; height: 32; radius: 6
+                        color: accent
+                        Text {
+                            anchors.centerIn: parent
+                            text: "다운로드"
+                            color: "#0f1115"
+                            font.pixelSize: 12
+                            font.weight: Font.DemiBold
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                Qt.openUrlExternally(updateOverlay.downloadUrl)
+                                updateOverlay.visible = false
+                            }
+                        }
+                    }
+                    Rectangle {
+                        width: 80; height: 32; radius: 6
+                        color: elevated
+                        border.color: root.border
+                        Text {
+                            anchors.centerIn: parent
+                            text: "닫기"
+                            color: root.text
+                            font.pixelSize: 12
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: updateOverlay.visible = false
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Connections {
+        target: pyFunc
+        function onUpdateAvailable(version, url) {
+            updateOverlay.titleText = "업데이트 발견"
+            updateOverlay.message = "새 버전 " + version + " 이(가) 있습니다.\n현재 버전: " + appVersion
+            updateOverlay.downloadUrl = url
+            updateOverlay.visible = true
+        }
+        function onUpToDate(version) {
+            updateOverlay.titleText = "최신 버전"
+            updateOverlay.message = "현재 최신 버전입니다.\n버전: " + appVersion
+            updateOverlay.downloadUrl = ""
+            updateOverlay.visible = true
+        }
+        function onUpdateFailed(error) {
+            updateOverlay.titleText = "확인 실패"
+            updateOverlay.message = "업데이트 서버에 연결할 수 없습니다.\n" + error
+            updateOverlay.downloadUrl = ""
+            updateOverlay.visible = true
         }
     }
 
